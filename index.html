@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PanoramaStitcher — Client-side GigaPan Panorama Stitching</title>
+  <meta name="description" content="A fully static web app that stitches up to 100 JPEG images shot on a GigaPan pan/tilt head into a single Rectangle or 360° Equirectangular panorama, entirely in the browser (WASM + GPU).">
+
+  <!-- ===== Pinned CDN libraries ===== -->
+  <!-- Leaflet 1.9.4 : shooting-location map (OSM standard layer) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- exifr 7.1.3 : Exif GPS / timestamp reading (Phase 3) -->
+  <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"
+          integrity="sha384-KrOocIA+lZcNUz2MDavnT/FuX+CbTREJihUi0bp8QUSwhE2AkGTNpv2b7yMbBkx5" crossorigin="anonymous"></script>
+  <!-- piexifjs 1.0.6 : Exif GPS writing into the stitched JPEG (Phase 5) -->
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"
+          integrity="sha384-pQscxfezjt6vZacoDAQEvU7OYak0dB/9o/VoBbzD8SrYGu63hWctWY25MxxIXSAX" crossorigin="anonymous"></script>
+  <!-- JSZip 3.10.1 : JPEG + KML bundling (Phase 5) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+  <!-- OpenCV.js (WASM) is lazy-loaded inside a Web Worker in Phase 4; not loaded here. -->
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header id="app-header">
+    <h1 id="app-title">PanoramaStitcher</h1>
+    <span id="app-subtitle">GigaPan → Rectangle / 360° Equirectangular, 100% in your browser</span>
+    <span id="engine-status" class="status-chip status-idle" title="Stitching engine status">Engine: idle</span>
+  </header>
+
+  <!-- ===== Main layout: left workflow column / right map column ===== -->
+  <main id="app-main">
+
+    <!-- ---- Left: workflow panel ---- -->
+    <section id="workflow-panel">
+
+      <!-- Step 1: Upload -->
+      <details class="step" id="step-upload" open>
+        <summary><span class="step-no">1</span> Load images</summary>
+        <div class="step-body">
+          <div id="drop-zone" tabindex="0" role="button"
+               aria-label="Drop JPEG images here or click to browse">
+            <p class="dz-main">Drop JPEG images here</p>
+            <p class="dz-sub">or click to browse — up to 100 files</p>
+            <input type="file" id="file-input" accept="image/jpeg,.jpg,.jpeg" multiple hidden>
+          </div>
+          <p id="upload-summary" class="muted">No images loaded.</p>
+        </div>
+      </details>
+
+      <!-- Step 2: Matrix configuration (logic lands in Phase 2) -->
+      <details class="step" id="step-matrix" open>
+        <summary><span class="step-no">2</span> Matrix &amp; shooting pattern</summary>
+        <div class="step-body">
+          <div class="field-row">
+            <label for="rows-input">Rows (elevation)</label>
+            <input type="number" id="rows-input" min="1" max="100" value="1">
+            <label for="cols-input">Columns (azimuth)</label>
+            <input type="number" id="cols-input" min="1" max="100" value="1">
+          </div>
+          <div class="field-row">
+            <label for="order-select">Capture order</label>
+            <select id="order-select">
+              <option value="azimuth-first" selected>Azimuth first (row by row)</option>
+              <option value="elevation-first">Elevation first (column by column)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="direction-select">Direction</label>
+            <select id="direction-select">
+              <option value="cw" selected>Clockwise / left → right</option>
+              <option value="ccw">Counter-clockwise / right → left</option>
+            </select>
+            <label for="scan-select">Scan</label>
+            <select id="scan-select">
+              <option value="parallel" selected>Parallel (raster)</option>
+              <option value="zigzag">Zig-zag (serpentine)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="start-corner-select">Start corner</label>
+            <select id="start-corner-select">
+              <option value="top-left" selected>Top left</option>
+              <option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+            </select>
+            <button id="apply-matrix-btn" class="btn" disabled
+                    title="Arrange loaded images into the grid (Phase 2)">Arrange grid</button>
+          </div>
+
+          <!-- Thumbnail matrix placeholder — interactive grid lands in Phase 2 -->
+          <div id="matrix-container">
+            <p class="muted" id="matrix-placeholder">The thumbnail matrix will appear here after images are loaded and arranged.</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- Step 3: Stitch (engine lands in Phase 4) -->
+      <details class="step" id="step-stitch">
+        <summary><span class="step-no">3</span> Stitch</summary>
+        <div class="step-body">
+          <div class="field-row">
+            <label for="mode-select">Output mode</label>
+            <select id="mode-select">
+              <option value="equirectangular" selected>360° Equirectangular</option>
+              <option value="rectangle">Rectangle (flat)</option>
+            </select>
+            <button id="stitch-btn" class="btn btn-primary" disabled
+                    title="Stitching engine lands in Phase 4">Stitch panorama</button>
+          </div>
+          <progress id="stitch-progress" max="100" value="0" hidden></progress>
+          <p id="stitch-status" class="muted">Load and arrange images first.</p>
+          <div id="result-container" hidden>
+            <canvas id="result-canvas"></canvas>
+          </div>
+        </div>
+      </details>
+
+      <!-- Step 4: Export (Exif injection + KML lands in Phase 5) -->
+      <details class="step" id="step-export">
+        <summary><span class="step-no">4</span> Export</summary>
+        <div class="step-body">
+          <div class="field-row">
+            <label><input type="checkbox" id="kml-checkbox">
+              Also generate KML PhotoOverlay (zipped with the JPEG)</label>
+          </div>
+          <div class="field-row">
+            <button id="download-btn" class="btn btn-primary" disabled
+                    title="Available after stitching">Download panorama JPEG</button>
+          </div>
+        </div>
+      </details>
+
+    </section>
+
+    <!-- ---- Right: shooting-location map ---- -->
+    <aside id="map-panel">
+      <div id="map-toolbar">
+        <span>Shooting location</span>
+        <span id="coords-readout" class="muted">35.681236, 139.767125 (default: Tokyo Station)</span>
+        <button id="geolocate-btn" class="btn btn-small" title="Use my current location">📍 My location</button>
+      </div>
+      <div id="map"></div>
+    </aside>
+
+  </main>
+
+  <footer id="app-footer">
+    <span>© 2026 mapconcierge — MIT License · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</span>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

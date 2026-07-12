@@ -1,0 +1,248 @@
+/* =========================================================
+   PanoramaStitcher — base stylesheet (Phase 1)
+   ========================================================= */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --border: #d9dde3;
+  --text: #1f2933;
+  --muted: #6b7683;
+  --accent: #0b6e4f;        /* stitch/download actions */
+  --accent-hover: #0e8a63;
+  --chip-idle: #e2e6eb;
+  --chip-busy: #ffe9b8;
+  --chip-ready: #cdeedd;
+  --danger: #b3372f;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Header ===== */
+#app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+#app-title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+#app-subtitle {
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex: 1;
+}
+
+.status-chip {
+  font-size: 0.75rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.status-idle  { background: var(--chip-idle); }
+.status-busy  { background: var(--chip-busy); }
+.status-ready { background: var(--chip-ready); }
+
+/* ===== Main two-column layout ===== */
+#app-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, 480px);
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;           /* allow children to scroll */
+}
+
+@media (max-width: 900px) {
+  #app-main { grid-template-columns: 1fr; }
+  #map-panel { min-height: 320px; }
+}
+
+/* ===== Workflow panel (left) ===== */
+#workflow-panel {
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.step > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  user-select: none;
+  list-style: none;
+}
+.step > summary::-webkit-details-marker { display: none; }
+
+.step-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.step-body {
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.field-row label { font-size: 0.85rem; }
+
+.field-row input[type="number"] {
+  width: 70px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.field-row select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.muted { color: var(--muted); font-size: 0.82rem; }
+
+/* ===== Buttons ===== */
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.btn:hover:not(:disabled) { background: #f0f2f5; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-small { padding: 3px 10px; font-size: 0.78rem; }
+
+/* ===== Drop zone ===== */
+#drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  outline: none;
+}
+#drop-zone:hover,
+#drop-zone:focus-visible { border-color: var(--accent); }
+#drop-zone.drag-over {
+  border-color: var(--accent);
+  background: #eef7f3;
+}
+.dz-main { margin: 0 0 4px; font-weight: 600; }
+.dz-sub  { margin: 0; color: var(--muted); font-size: 0.82rem; }
+
+/* ===== Matrix container (interactive grid lands in Phase 2) ===== */
+#matrix-container {
+  margin-top: 10px;
+  min-height: 60px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  overflow-x: auto;
+  background: #fafbfc;
+}
+
+/* ===== Stitch result ===== */
+#stitch-progress { width: 100%; }
+#result-container { margin-top: 10px; overflow-x: auto; }
+#result-canvas { max-width: 100%; border: 1px solid var(--border); border-radius: 4px; }
+
+/* ===== Map panel (right) ===== */
+#map-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+#map-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+#map-toolbar .muted { flex: 1; font-weight: 400; }
+
+#map { flex: 1; min-height: 240px; }
+
+/* Camera marker (Leaflet divIcon) */
+.camera-marker {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+  cursor: grab;
+}
+
+/* ===== Footer ===== */
+#app-footer {
+  padding: 6px 16px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+#app-footer a { color: inherit; }
