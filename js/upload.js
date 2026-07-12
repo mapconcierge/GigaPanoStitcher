@@ -2,8 +2,8 @@
 // PanoramaStitcher — drag-and-drop / file-picker intake
 // =========================================================
 
-import { MAX_IMAGES, ACCEPTED_TYPES } from './config.js';
-import { state, addImages, on } from './state.js';
+import { MAX_IMAGES, ACCEPTED_TYPES, THUMB_SIZE } from './config.js';
+import { state, addImages, on, emit } from './state.js';
 
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
@@ -28,9 +28,37 @@ function normalizeFiles(fileList) {
   };
 }
 
+/**
+ * Generate a downscaled thumbnail for one entry (fire-and-forget).
+ * Full-size GigaPan JPEGs are too heavy to decode 100× in the matrix.
+ */
+async function makeThumb(entry) {
+  try {
+    const bmp = await createImageBitmap(entry.file, {
+      resizeWidth: THUMB_SIZE,
+      resizeQuality: 'medium',
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext('2d').drawImage(bmp, 0, 0);
+    bmp.close();
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.75));
+    if (blob) {
+      entry.thumbUrl = URL.createObjectURL(blob);
+      emit('thumb', entry);
+    }
+  } catch {
+    // Corrupt/undecodable JPEG — the matrix falls back to the full-size URL.
+  }
+}
+
 function handleFiles(fileList) {
   const { accepted, rejectedType, rejectedOverflow } = normalizeFiles(fileList);
-  if (accepted.length) addImages(accepted);
+  if (accepted.length) {
+    const entries = addImages(accepted);
+    entries.forEach(makeThumb);
+  }
 
   const notes = [];
   if (rejectedType) notes.push(`${rejectedType} non-JPEG file(s) skipped`);

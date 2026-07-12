@@ -33,12 +33,13 @@ export const ScanPattern = Object.freeze({
   ZIGZAG: 'zigzag',     // alternating passes (serpentine)
 });
 
-export const StartCorner = Object.freeze({
-  TOP_LEFT: 'top-left',
-  TOP_RIGHT: 'top-right',
-  BOTTOM_LEFT: 'bottom-left',
-  BOTTOM_RIGHT: 'bottom-right',
+export const StartRow = Object.freeze({
+  TOP: 'top',       // first pass is the top row (or columns fill top→bottom)
+  BOTTOM: 'bottom', // first pass is the bottom row
 });
+
+/** Max edge length (px) of generated thumbnails in the matrix UI. */
+export const THUMB_SIZE = 160;
 
 /** Output projection modes for the stitcher (Phase 4). */
 export const OutputMode = Object.freeze({
