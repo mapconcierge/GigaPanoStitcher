@@ -30,10 +30,13 @@
 
 'use strict';
 
-// npm re-packaging of the official OpenCV.js 4.10.0 build, served from
-// the same pinned CDN as the page's other libraries (docs.opencv.org
-// has no versioned immutable URLs and spotty availability).
-const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
+// Vendored copy of the official OpenCV.js 4.10.0 build (via the
+// @techstark/opencv-js 4.10.0-release.1 npm package). Served
+// same-origin because importScripts has no SRI: this worker holds
+// every source photo, so it must never execute unverified
+// cross-origin code (sha384: XsTfGA62I8LzqS3D7IcgiSOCrJuECWLcg4s1
+// M0AnrkDCcJ8lXX+j+qdg+o6t7KZa).
+const OPENCV_URL = '../vendor/opencv-4.10.0.js';
 
 /** Fraction of each frame searched for features along a shared edge. */
 const STRIP_FRAC = 0.5;
