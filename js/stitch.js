@@ -26,14 +26,15 @@ function setChip(text, cls) {
 
 /**
  * Processing size (longest edge, px). 'auto' shrinks with the image
- * count so a 100-frame set doesn't exhaust browser memory.
+ * count so a 300-frame set doesn't exhaust browser memory.
  */
 function maxEdgeFor(count) {
   const v = resSelect.value;
   if (v !== 'auto') return v === 'full' ? Infinity : parseInt(v, 10);
   if (count <= 20) return 2048;
   if (count <= 50) return 1600;
-  return 1200;
+  if (count <= 100) return 1200;
+  return 800;
 }
 
 /** Decode one entry and downscale to maxEdge (aspect preserved). */
