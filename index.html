@@ -111,8 +111,17 @@
               <option value="equirectangular" selected>360° Equirectangular</option>
               <option value="rectangle">Rectangle (flat)</option>
             </select>
+            <label for="resolution-select">Processing size</label>
+            <select id="resolution-select"
+                    title="Longest edge per source image during stitching. Auto shrinks with the image count to protect memory.">
+              <option value="auto" selected>Auto (recommended)</option>
+              <option value="1024">1024 px</option>
+              <option value="1600">1600 px</option>
+              <option value="2048">2048 px</option>
+              <option value="full">Full resolution</option>
+            </select>
             <button id="stitch-btn" class="btn btn-primary" disabled
-                    title="Stitching engine lands in Phase 4">Stitch panorama</button>
+                    title="Arrange the grid first">Stitch panorama</button>
           </div>
           <progress id="stitch-progress" max="100" value="0" hidden></progress>
           <p id="stitch-status" class="muted">Load and arrange images first.</p>

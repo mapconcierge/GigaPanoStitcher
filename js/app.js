@@ -12,6 +12,7 @@ import { initUpload } from './upload.js';
 import { initMap } from './map.js';
 import { initMatrix } from './matrix.js';
 import { initExif } from './exif.js';
+import { initStitch } from './stitch.js';
 import { state, on } from './state.js';
 
 const applyMatrixBtn = document.getElementById('apply-matrix-btn');
@@ -22,12 +23,13 @@ function init() {
   initMap();
   initMatrix();
   initExif();
+  initStitch();
 
   on('images', (images) => {
     applyMatrixBtn.disabled = images.length === 0;
     if (!state.grid) {
       stitchStatus.textContent = images.length
-        ? 'Arrange the grid, then stitching becomes available (Phase 4).'
+        ? 'Arrange the grid to enable stitching.'
         : 'Load and arrange images first.';
     }
   });
@@ -36,7 +38,7 @@ function init() {
     if (!grid) return;
     const placed = grid.flat().filter(Boolean).length;
     stitchStatus.textContent =
-      `Grid ${state.rows}×${state.cols} — ${placed} image(s) placed. Stitching engine lands in Phase 4.`;
+      `Grid ${state.rows}×${state.cols} — ${placed} image(s) placed. Ready to stitch.`;
   });
 }
 
