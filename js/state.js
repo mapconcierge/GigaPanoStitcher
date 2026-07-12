@@ -67,6 +67,7 @@ export function addImages(files) {
     url: URL.createObjectURL(file),
     thumbUrl: null,
     seq: state.images.length + 0, // placeholder; fixed below
+    exifParsed: false,
     takenAt: null,
     gps: null,
   }));
