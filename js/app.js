@@ -13,6 +13,7 @@ import { initMap } from './map.js';
 import { initMatrix } from './matrix.js';
 import { initExif } from './exif.js';
 import { initStitch } from './stitch.js';
+import { initExport } from './export.js';
 import { state, on } from './state.js';
 
 const applyMatrixBtn = document.getElementById('apply-matrix-btn');
@@ -24,6 +25,7 @@ function init() {
   initMatrix();
   initExif();
   initStitch();
+  initExport();
 
   on('images', (images) => {
     applyMatrixBtn.disabled = images.length === 0;
