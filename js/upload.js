@@ -77,6 +77,17 @@ export function initUpload() {
     if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files);
   });
 
+  // Global guard: a drop released outside the drop zone (map, panels, …)
+  // must never navigate the page away. File drops anywhere are routed
+  // into the uploader instead.
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!dropZone.contains(e.target) && e.dataTransfer?.files?.length) {
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
   // Keep the summary line in sync with state
   on('images', () => { summary.textContent = summaryText(); });
 }
