@@ -23,10 +23,10 @@ https://mapconcierge.github.io/PanoramaSticher/
 | Phase | Feature | Status |
 |-------|---------|--------|
 | 1 | UI shell, Leaflet map, drag-and-drop upload | ✅ Done |
-| 2 | GigaPan shooting-pattern logic + interactive thumbnail matrix | 🚧 Planned |
-| 3 | Exif GPS/timestamp parsing → map marker | 🚧 Planned |
-| 4 | OpenCV.js (WASM) stitching engine | 🚧 Planned |
-| 5 | Exif GPS injection + KML PhotoOverlay export | 🚧 Planned |
+| 2 | GigaPan shooting-pattern logic + interactive thumbnail matrix | ✅ Done |
+| 3 | Exif GPS/timestamp parsing → map marker | ✅ Done |
+| 4 | OpenCV.js (WASM) stitching engine | ✅ Done |
+| 5 | Exif GPS injection + KML PhotoOverlay export | ✅ Done |
 
 ### Usage
 
@@ -35,12 +35,12 @@ https://mapconcierge.github.io/PanoramaSticher/
    - *Capture order*: Azimuth first (row by row) / Elevation first (column by column)
    - *Direction*: Clockwise (left → right) / Counter-clockwise (right → left)
    - *Scan*: Parallel (raster) / Zig-zag (serpentine)
-   - *Start corner*: Top left / Top right / Bottom left / Bottom right
+   - *Start row*: Top / Bottom (left/right is implied by Direction)
 
-   Click **Arrange grid** to lay the thumbnails out in a matrix. You can then drag and drop thumbnails to fix any misplacement, or remove/add images. *(Phase 2)*
-3. **Shooting location** — The map (right panel) shows a draggable 📷 camera marker. When your photos contain Exif GPS, the location of the last shot is used automatically *(Phase 3)*; otherwise it defaults to Tokyo Station, or your current position via the **📍 My location** button. Drag the marker to correct the location — it is written into the output JPEG's Exif.
-4. **Stitch** — Choose the output mode (**360° Equirectangular** or **Rectangle**) and click **Stitch panorama**. Feature extraction and blending run in a Web Worker using OpenCV.js (WASM). *(Phase 4)*
-5. **Export** — Download the stitched panorama as a JPEG with the corrected GPS coordinates injected into its Exif. Check **"Also generate KML PhotoOverlay"** to get a ZIP containing the JPEG plus a KML PhotoOverlay file for Google Earth. *(Phase 5)*
+   Click **Arrange grid** to lay the thumbnails out in a matrix. You can then drag and drop thumbnails to fix any misplacement, or remove/add images.
+3. **Shooting location** — The map (right panel) shows a draggable 📷 camera marker. When your photos contain Exif GPS, the location of the last shot is used automatically; otherwise it defaults to Tokyo Station, or your current position via the **📍 My location** button. Drag the marker to correct the location — it is written into the output JPEG's Exif.
+4. **Stitch** — Choose the output mode (**360° Equirectangular** or **Rectangle**) and click **Stitch panorama**. Feature extraction and blending run in a Web Worker using OpenCV.js (WASM).
+5. **Export** — Download the stitched panorama as a JPEG with the corrected GPS coordinates injected into its Exif. Check **"Bundle a KML PhotoOverlay for Google Earth"** to get a .kmz (KML PhotoOverlay + the JPEG) that opens directly in Google Earth.
 
 ### Running locally
 
@@ -62,8 +62,8 @@ python3 -m http.server 8080
 | Map | [Leaflet](https://leafletjs.com/) 1.9.4 + OpenStreetMap standard layer | WGS84 (EPSG:4326) coordinates |
 | Exif reading | [exifr](https://github.com/MikeKovarik/exifr) 7.1.3 | GPS + DateTimeOriginal |
 | Exif writing | [piexifjs](https://github.com/hMatoba/piexifjs) 1.0.6 | GPS injection into output JPEG |
-| Archiving | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | JPEG + KML bundling |
-| Computer vision | OpenCV.js (WASM) | Lazy-loaded in a Web Worker (Phase 4) |
+| Archiving | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | .kmz (KML + JPEG) bundling |
+| Computer vision | OpenCV.js 4.10.0 (WASM, vendored) | Loaded in a Web Worker on first stitch |
 
 All CDN assets are version-pinned with Subresource Integrity (SRI) hashes.
 
@@ -99,10 +99,10 @@ Taichi FURUHASHI ([@mapconcierge](https://github.com/mapconcierge)) — Furuhash
 | フェーズ | 機能 | 状況 |
 |---------|------|------|
 | 1 | UI シェル・Leaflet 地図・ドラッグ&ドロップ読み込み | ✅ 完了 |
-| 2 | GigaPan 撮影パターン解析 + サムネイルマトリクス編集 UI | 🚧 予定 |
-| 3 | Exif GPS/タイムスタンプ解析 → 地図マーカー連携 | 🚧 予定 |
-| 4 | OpenCV.js（WASM）スティッチングエンジン | 🚧 予定 |
-| 5 | Exif GPS 書き込み + KML PhotoOverlay 出力 | 🚧 予定 |
+| 2 | GigaPan 撮影パターン解析 + サムネイルマトリクス編集 UI | ✅ 完了 |
+| 3 | Exif GPS/タイムスタンプ解析 → 地図マーカー連携 | ✅ 完了 |
+| 4 | OpenCV.js（WASM）スティッチングエンジン | ✅ 完了 |
+| 5 | Exif GPS 書き込み + KML PhotoOverlay 出力 | ✅ 完了 |
 
 ### 使い方
 
@@ -111,12 +111,12 @@ Taichi FURUHASHI ([@mapconcierge](https://github.com/mapconcierge)) — Furuhash
    - *Capture order（撮影順）*: Azimuth first（行ごと）/ Elevation first（列ごと）
    - *Direction（回転方向）*: Clockwise（左→右）/ Counter-clockwise（右→左）
    - *Scan（走査）*: Parallel（ラスタ）/ Zig-zag（つづら折り）
-   - *Start corner（開始位置）*: 左上 / 右上 / 左下 / 右下
+   - *Start row（開始行）*: Top（上段から）/ Bottom（下段から）— 左右は Direction で決まります
 
-   **Arrange grid** をクリックするとサムネイルがマトリクス状に配置されます。ドラッグ&ドロップで並べ替え・削除・追加が可能です。*（Phase 2）*
-3. **撮影地点（Shooting location）** — 右パネルの地図にドラッグ可能な 📷 カメラマーカーが表示されます。写真に Exif GPS がある場合は最後に撮影された 1 枚の位置が自動採用され *（Phase 3）*、ない場合は東京駅、または **📍 My location** ボタンで現在地が初期位置になります。マーカーをドラッグして撮影地点を修正でき、その座標が出力 JPEG の Exif に書き込まれます。
-4. **合成（Stitch）** — 出力モード（**360° Equirectangular** / **Rectangle**）を選び **Stitch panorama** をクリックします。特徴点抽出と合成は OpenCV.js（WASM）を用いて Web Worker 内で実行されます。*（Phase 4）*
-5. **書き出し（Export）** — 合成したパノラマを、修正済み GPS 座標を Exif に埋め込んだ JPEG としてダウンロードします。**"Also generate KML PhotoOverlay"** にチェックを入れると、Google Earth 用の KML PhotoOverlay ファイルを JPEG と一緒に ZIP で出力します。*（Phase 5）*
+   **Arrange grid** をクリックするとサムネイルがマトリクス状に配置されます。ドラッグ&ドロップで並べ替え・削除・追加が可能です。
+3. **撮影地点（Shooting location）** — 右パネルの地図にドラッグ可能な 📷 カメラマーカーが表示されます。写真に Exif GPS がある場合は最後に撮影された 1 枚の位置が自動採用され、ない場合は東京駅、または **📍 My location** ボタンで現在地が初期位置になります。マーカーをドラッグして撮影地点を修正でき、その座標が出力 JPEG の Exif に書き込まれます。
+4. **合成（Stitch）** — 出力モード（**360° Equirectangular** / **Rectangle**）を選び **Stitch panorama** をクリックします。特徴点抽出と合成は OpenCV.js（WASM）を用いて Web Worker 内で実行されます。
+5. **書き出し（Export）** — 合成したパノラマを、修正済み GPS 座標を Exif に埋め込んだ JPEG としてダウンロードします。**"Bundle a KML PhotoOverlay for Google Earth"** にチェックを入れると、Google Earth でそのまま開ける .kmz（KML PhotoOverlay + JPEG）を出力します。
 
 ### ローカルでの実行
 
@@ -138,8 +138,8 @@ python3 -m http.server 8080
 | 地図 | [Leaflet](https://leafletjs.com/) 1.9.4 + OpenStreetMap 標準レイヤ | 座標系は WGS84（EPSG:4326） |
 | Exif 読み込み | [exifr](https://github.com/MikeKovarik/exifr) 7.1.3 | GPS + DateTimeOriginal |
 | Exif 書き込み | [piexifjs](https://github.com/hMatoba/piexifjs) 1.0.6 | 出力 JPEG への GPS 埋め込み |
-| アーカイブ | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | JPEG + KML の ZIP 化 |
-| 画像処理 | OpenCV.js（WASM） | Web Worker 内で遅延読み込み（Phase 4） |
+| アーカイブ | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | .kmz（KML + JPEG）生成 |
+| 画像処理 | OpenCV.js 4.10.0（WASM・同梱） | 初回スティッチ時に Web Worker 内でロード |
 
 CDN アセットはすべてバージョン固定 + Subresource Integrity（SRI）ハッシュ付きです。
 
