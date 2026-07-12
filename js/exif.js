@@ -11,6 +11,7 @@
 // All coordinates are WGS84 (EPSG:4326), as stored in Exif.
 
 import { state, on, emit, setLocation } from './state.js';
+import { DEFAULT_LOCATION } from './config.js';
 
 /* global exifr */
 
@@ -33,34 +34,47 @@ async function parseEntry(entry) {
 
 /**
  * Among images with a GPS fix, pick the one captured last.
- * Images without a timestamp sort by load sequence instead.
+ * When every GPS image carries a timestamp the latest one wins;
+ * if any lacks a timestamp, timestamps can't order the set
+ * reliably, so the whole selection falls back to load order.
  * @returns {?{lat: number, lng: number}}
  */
 export function lastCapturedGps() {
   const withGps = state.images.filter((e) => e.gps);
   if (!withGps.length) return null;
-  withGps.sort((a, b) => {
-    const ta = a.takenAt?.getTime() ?? Number.NEGATIVE_INFINITY;
-    const tb = b.takenAt?.getTime() ?? Number.NEGATIVE_INFINITY;
-    return ta === tb ? a.seq - b.seq : ta - tb;
-  });
-  return withGps[withGps.length - 1].gps;
+  const allTimed = withGps.every((e) => e.takenAt);
+  let best = withGps[0];
+  for (const e of withGps.slice(1)) {
+    const later = allTimed
+      ? e.takenAt.getTime() > best.takenAt.getTime()
+        || (e.takenAt.getTime() === best.takenAt.getTime() && e.seq > best.seq)
+      : e.seq > best.seq;
+    if (later) best = e;
+  }
+  return best.gps;
 }
 
-/** Re-evaluate the map location after a batch finished parsing. */
+/** Re-evaluate the map location whenever the image set changes. */
 function applyLocation() {
   // Never override a position the user placed by hand.
   if (state.locationSource === 'user') return;
   const gps = lastCapturedGps();
-  if (gps) setLocation(gps.lat, gps.lng, 'exif');
+  if (gps) {
+    setLocation(gps.lat, gps.lng, 'exif');
+  } else if (state.locationSource === 'exif') {
+    // The photo the marker came from is gone — don't keep stale coords.
+    setLocation(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng, 'default');
+  }
 }
 
 export function initExif() {
   on('images', async (images) => {
     const fresh = images.filter((e) => !e.exifParsed);
-    if (!fresh.length) return;
-    await Promise.all(fresh.map(parseEntry));
-    emit('exif', fresh);
+    if (fresh.length) {
+      await Promise.all(fresh.map(parseEntry));
+      emit('exif', fresh);
+    }
+    // Runs on deletions too: the Exif-selected photo may have been removed.
     applyLocation();
   });
 }
