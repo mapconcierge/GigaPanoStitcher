@@ -84,15 +84,14 @@
             </select>
           </div>
           <div class="field-row">
-            <label for="start-corner-select">Start corner</label>
-            <select id="start-corner-select">
-              <option value="top-left" selected>Top left</option>
-              <option value="top-right">Top right</option>
-              <option value="bottom-left">Bottom left</option>
-              <option value="bottom-right">Bottom right</option>
+            <label for="start-row-select">Start row</label>
+            <select id="start-row-select"
+                    title="Whether the first pass is the top or the bottom row; left/right follows Direction">
+              <option value="top" selected>Top (first shot is the top row)</option>
+              <option value="bottom">Bottom (first shot is the bottom row)</option>
             </select>
             <button id="apply-matrix-btn" class="btn" disabled
-                    title="Arrange loaded images into the grid (Phase 2)">Arrange grid</button>
+                    title="Arrange loaded images into the grid">Arrange grid</button>
           </div>
 
           <!-- Thumbnail matrix placeholder — interactive grid lands in Phase 2 -->
