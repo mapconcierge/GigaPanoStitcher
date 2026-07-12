@@ -11,6 +11,7 @@
 import { initUpload } from './upload.js';
 import { initMap } from './map.js';
 import { initMatrix } from './matrix.js';
+import { initExif } from './exif.js';
 import { state, on } from './state.js';
 
 const applyMatrixBtn = document.getElementById('apply-matrix-btn');
@@ -20,6 +21,7 @@ function init() {
   initUpload();
   initMap();
   initMatrix();
+  initExif();
 
   on('images', (images) => {
     applyMatrixBtn.disabled = images.length === 0;
