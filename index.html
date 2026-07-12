@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PanoramaStitcher — Client-side GigaPan Panorama Stitching</title>
-  <meta name="description" content="A fully static web app that stitches up to 100 JPEG images shot on a GigaPan pan/tilt head into a single Rectangle or 360° Equirectangular panorama, entirely in the browser (WASM + GPU).">
+  <meta name="description" content="A fully static web app that stitches up to 300 JPEG images shot on a GigaPan pan/tilt head into a single Rectangle or 360° Equirectangular panorama, entirely in the browser (WASM + GPU).">
 
   <!-- ===== Pinned CDN libraries ===== -->
   <!-- Leaflet 1.9.4 : shooting-location map (OSM standard layer) -->
@@ -47,7 +47,7 @@
           <div id="drop-zone" tabindex="0" role="button"
                aria-label="Drop JPEG images here or click to browse">
             <p class="dz-main">Drop JPEG images here</p>
-            <p class="dz-sub">or click to browse — up to 100 files</p>
+            <p class="dz-sub">or click to browse — up to 300 files</p>
             <input type="file" id="file-input" accept="image/jpeg,.jpg,.jpeg" multiple hidden>
           </div>
           <p id="upload-summary" class="muted">No images loaded.</p>
@@ -60,9 +60,9 @@
         <div class="step-body">
           <div class="field-row">
             <label for="rows-input">Rows (elevation)</label>
-            <input type="number" id="rows-input" min="1" max="100" value="1">
+            <input type="number" id="rows-input" min="1" max="300" value="1">
             <label for="cols-input">Columns (azimuth)</label>
-            <input type="number" id="cols-input" min="1" max="100" value="1">
+            <input type="number" id="cols-input" min="1" max="300" value="1">
           </div>
           <div class="field-row">
             <label for="order-select">Capture order</label>

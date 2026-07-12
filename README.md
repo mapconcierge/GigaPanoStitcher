@@ -12,7 +12,7 @@ https://mapconcierge.github.io/PanoramaSticher/
 
 ### Overview
 
-**PanoramaStitcher** is a fully client-side web application that stitches up to 100 JPEG images shot on a motorized pan/tilt head (GigaPan device) into a single high-resolution panorama — either a flat **Rectangle** or a **360° Equirectangular** image — entirely in your browser.
+**PanoramaStitcher** is a fully client-side web application that stitches up to 300 JPEG images shot on a motorized pan/tilt head (GigaPan device) into a single high-resolution panorama — either a flat **Rectangle** or a **360° Equirectangular** image — entirely in your browser.
 
 - No backend server: 100% static (HTML / CSS / JS / WASM), hostable on GitHub Pages
 - Computer vision runs locally via WebAssembly (OpenCV.js) with GPU acceleration
@@ -30,7 +30,7 @@ https://mapconcierge.github.io/PanoramaSticher/
 
 ### Usage
 
-1. **Load images** — Drag and drop your JPEG files (up to 100) onto the drop zone, or click it to browse. Files are automatically sorted by filename (natural sort), which restores the GigaPan capture order. Dropping files anywhere on the page is safe — they are routed into the uploader.
+1. **Load images** — Drag and drop your JPEG files (up to 300) onto the drop zone, or click it to browse. Files are automatically sorted by filename (natural sort), which restores the GigaPan capture order. Dropping files anywhere on the page is safe — they are routed into the uploader.
 2. **Matrix & shooting pattern** — Enter the number of **rows (elevation)** and **columns (azimuth)**, then select the shooting pattern used by your GigaPan head:
    - *Capture order*: Azimuth first (row by row) / Elevation first (column by column)
    - *Direction*: Clockwise (left → right) / Counter-clockwise (right → left)
@@ -88,7 +88,7 @@ Taichi FURUHASHI ([@mapconcierge](https://github.com/mapconcierge)) — Furuhash
 
 ### 概要
 
-**PanoramaStitcher** は、電動パン/チルト雲台（GigaPan デバイス）で連続撮影した最大 100 枚の JPEG 画像を、ブラウザだけで 1 枚の高解像度パノラマ（平面 **Rectangle** または **360度 Equirectangular**）に合成する、完全クライアントサイドの Web アプリです。
+**PanoramaStitcher** は、電動パン/チルト雲台（GigaPan デバイス）で連続撮影した最大 300 枚の JPEG 画像を、ブラウザだけで 1 枚の高解像度パノラマ（平面 **Rectangle** または **360度 Equirectangular**）に合成する、完全クライアントサイドの Web アプリです。
 
 - バックエンドサーバ不要：100% 静的（HTML / CSS / JS / WASM）で GitHub Pages にホスト可能
 - 画像処理は WebAssembly（OpenCV.js）+ GPU アクセラレーションでローカル実行
@@ -106,7 +106,7 @@ Taichi FURUHASHI ([@mapconcierge](https://github.com/mapconcierge)) — Furuhash
 
 ### 使い方
 
-1. **画像の読み込み（Load images）** — JPEG ファイル（最大 100 枚）をドロップゾーンにドラッグ&ドロップするか、クリックしてファイルを選択します。ファイル名の自然順ソートにより GigaPan の撮影順が自動的に復元されます。ページ上のどこにドロップしても安全にアップローダへ取り込まれます。
+1. **画像の読み込み（Load images）** — JPEG ファイル（最大 300 枚）をドロップゾーンにドラッグ&ドロップするか、クリックしてファイルを選択します。ファイル名の自然順ソートにより GigaPan の撮影順が自動的に復元されます。ページ上のどこにドロップしても安全にアップローダへ取り込まれます。
 2. **マトリクスと撮影パターン（Matrix & shooting pattern）** — **行数（仰角方向 / rows）** と **列数（方位角方向 / columns）** を入力し、GigaPan 雲台の撮影パターンを選択します：
    - *Capture order（撮影順）*: Azimuth first（行ごと）/ Elevation first（列ごと）
    - *Direction（回転方向）*: Clockwise（左→右）/ Counter-clockwise（右→左）

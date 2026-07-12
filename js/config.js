@@ -3,7 +3,7 @@
 // =========================================================
 
 /** Maximum number of input images. */
-export const MAX_IMAGES = 100;
+export const MAX_IMAGES = 300;
 
 /** Accepted MIME types (GigaPan rigs produce JPEG). */
 export const ACCEPTED_TYPES = ['image/jpeg'];
