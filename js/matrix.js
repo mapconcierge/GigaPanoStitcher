@@ -196,6 +196,9 @@ export function initMatrix() {
   rowsInput.addEventListener('input', suggestCols);
 
   on('grid', render);
+  // Images added or deleted after the grid exists must show up in the
+  // tray immediately (addImages only emits 'images', not 'grid')
+  on('images', () => { if (state.grid) render(); });
   // Swap in generated thumbnails without a full re-render
   on('thumb', (entry) => {
     for (const el of container.querySelectorAll(`[data-image-id="${entry.id}"] img`)) {
