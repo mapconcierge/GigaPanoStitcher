@@ -6,6 +6,7 @@
 // renders progress + the finished panorama.
 
 import { state, on, emit, getImage } from './state.js';
+import { ensureExifParsed } from './exif.js';
 
 const stitchBtn = document.getElementById('stitch-btn');
 const modeSelect = document.getElementById('mode-select');
@@ -136,7 +137,11 @@ async function startStitch() {
 
     // Median 35mm-equivalent focal length of the set (GigaPan rigs use
     // a fixed lens, so one value describes every frame). null → the
-    // worker falls back to a moderate default FOV.
+    // worker falls back to a moderate default FOV. Await the Exif pass
+    // first: stitching can start before the async parse finishes, and
+    // an unread focal must not masquerade as "no Exif".
+    statusEl.textContent = 'Reading Exif metadata…';
+    await ensureExifParsed(placed.map((p) => p.entry));
     const focals = placed.map((p) => p.entry.focal35).filter(Boolean).sort((a, b) => a - b);
     const focal35 = focals.length ? focals[focals.length >> 1] : null;
 
