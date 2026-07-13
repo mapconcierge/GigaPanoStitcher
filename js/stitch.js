@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — stitching controller (main thread)
+// GigaPanoStitcher — stitching controller (main thread)
 // =========================================================
 // Prepares downscaled ImageBitmaps from the arranged grid,
 // hands them to the worker (transferable, zero-copy), and

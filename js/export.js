@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — export: Exif injection + KML PhotoOverlay
+// GigaPanoStitcher — export: Exif injection + KML PhotoOverlay
 // =========================================================
 // The stitched JPEG gets the (possibly user-corrected) shooting
 // location written into its Exif GPS tags, plus a Software tag and
@@ -50,7 +50,7 @@ export async function injectExif(blob) {
     lat,
     lng,
     dateTimeOriginal: sourceCaptureTime(),
-    software: 'PanoramaStitcher',
+    software: 'GigaPanoStitcher',
   });
 
   // Sanity: canvas encoders emit SOI first (FF D8); splice right after it

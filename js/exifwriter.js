@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — dependency-free Exif APP1 builder
+// GigaPanoStitcher — dependency-free Exif APP1 builder
 // =========================================================
 // Replaces piexifjs for WRITING. The export path must not depend on
 // a CDN script: a blocked/miscached piexif.min.js left `piexif`

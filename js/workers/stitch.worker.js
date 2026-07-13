@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — stitching engine (Web Worker, Phase 4)
+// GigaPanoStitcher — stitching engine (Web Worker, Phase 4)
 // =========================================================
 // Classic worker: loads OpenCV.js (WASM) via importScripts on
 // first use. The official OpenCV.js build does not expose the

@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — central application state
+// GigaPanoStitcher — central application state
 // =========================================================
 // Single mutable store + a tiny pub/sub so UI modules stay
 // decoupled. No framework: subscribers re-render themselves.

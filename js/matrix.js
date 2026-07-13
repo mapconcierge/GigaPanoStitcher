@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — interactive thumbnail matrix UI
+// GigaPanoStitcher — interactive thumbnail matrix UI
 // =========================================================
 // Renders state.grid as a CSS grid of thumbnail cells with
 // row/column headers, plus a "tray" of unplaced images.
@@ -19,7 +19,7 @@ import { buildGrid } from './gigapan.js';
 
 const container = document.getElementById('matrix-container');
 
-const DND_TYPE = 'application/x-panostitcher-image-id';
+const DND_TYPE = 'application/x-gigapanostitcher-image-id';
 
 // ---- helpers -------------------------------------------------
 

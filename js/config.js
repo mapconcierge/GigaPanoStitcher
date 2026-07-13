@@ -1,9 +1,9 @@
 // =========================================================
-// PanoramaStitcher — constants & enums
+// GigaPanoStitcher — constants & enums
 // =========================================================
 
 /** App version, shown next to the title (bump on every release). */
-export const APP_VERSION = '0.8.1';
+export const APP_VERSION = '0.8.2';
 
 /** Maximum number of input images. */
 export const MAX_IMAGES = 300;

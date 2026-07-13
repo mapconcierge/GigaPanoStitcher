@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — entry point / orchestration
+// GigaPanoStitcher — entry point / orchestration
 // =========================================================
 // Phase 1: UI shell, upload intake, Leaflet map.
 // Later phases plug in here:
