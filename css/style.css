@@ -50,6 +50,14 @@ body {
   letter-spacing: 0.02em;
 }
 
+#app-version {
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--chip-idle);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
 #app-subtitle {
   font-size: 0.8rem;
   color: var(--muted);

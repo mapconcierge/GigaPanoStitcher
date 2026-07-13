@@ -2,6 +2,9 @@
 // PanoramaStitcher — constants & enums
 // =========================================================
 
+/** App version, shown next to the title (bump on every release). */
+export const APP_VERSION = '0.7.0';
+
 /** Maximum number of input images. */
 export const MAX_IMAGES = 300;
 

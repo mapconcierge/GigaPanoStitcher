@@ -15,15 +15,38 @@ import { DEFAULT_LOCATION } from './config.js';
 
 /* global exifr */
 
-/** Parse one entry (idempotent — marks the entry as processed). */
-async function parseEntry(entry) {
-  entry.exifParsed = true;
+// One parse promise per entry so other modules can AWAIT metadata
+// instead of racing it (e.g. the stitcher needs focal35 before its
+// cylindrical warp — an unset value must mean "no Exif", never
+// "Exif not read yet").
+const parsePromises = new Map(); // entry.id → Promise<void>
+
+/** Parse one entry (idempotent — one shared promise per entry). */
+function parseEntry(entry) {
+  if (!parsePromises.has(entry.id)) {
+    entry.exifParsed = true;
+    parsePromises.set(entry.id, doParse(entry));
+  }
+  return parsePromises.get(entry.id);
+}
+
+/** Await Exif metadata for the given entries (parses if needed). */
+export function ensureExifParsed(entries) {
+  return Promise.all(entries.map(parseEntry));
+}
+
+async function doParse(entry) {
   try {
     const [meta, gps] = await Promise.all([
-      exifr.parse(entry.file, { pick: ['DateTimeOriginal', 'CreateDate'] }),
+      exifr.parse(entry.file, {
+        pick: ['DateTimeOriginal', 'CreateDate', 'FocalLengthIn35mmFormat'],
+      }),
       exifr.gps(entry.file),
     ]);
     entry.takenAt = meta?.DateTimeOriginal ?? meta?.CreateDate ?? null;
+    // 35mm-equivalent focal length drives the cylindrical pre-warp
+    entry.focal35 = Number.isFinite(meta?.FocalLengthIn35mmFormat)
+      ? meta.FocalLengthIn35mmFormat : null;
     if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude)) {
       entry.gps = { lat: gps.latitude, lng: gps.longitude };
     }

@@ -6,6 +6,7 @@
 // renders progress + the finished panorama.
 
 import { state, on, emit, getImage } from './state.js';
+import { ensureExifParsed } from './exif.js';
 
 const stitchBtn = document.getElementById('stitch-btn');
 const modeSelect = document.getElementById('mode-select');
@@ -83,8 +84,9 @@ async function showResult({ blob, width, height, mode, pairStats }) {
   const quality = pairStats.fallbacks
     ? ` (${pairStats.fallbacks}/${pairStats.pairs} pair(s) used the fallback layout — check those seams)`
     : ` (${pairStats.pairs} pairs matched, ${pairStats.inlierTotal} inliers)`;
+  const proj = ` — cylindrical projection (${pairStats.focalFromExif ? 'Exif' : 'assumed'} ${pairStats.focal35}mm equiv.)`;
   statusEl.textContent =
-    `Done: ${width}×${height}px ${mode === 'equirectangular' ? '360° equirectangular' : 'rectangle'}${quality}`;
+    `Done: ${width}×${height}px ${mode === 'equirectangular' ? '360° equirectangular' : 'rectangle'}${quality}${proj}`;
   setChip('ready', 'status-ready');
   busy = false;
   stitchBtn.disabled = false;
@@ -133,6 +135,16 @@ async function startStitch() {
       cells.push({ id: placed[i].entry.id, row: placed[i].row, col: placed[i].col, bitmap });
     }
 
+    // Median 35mm-equivalent focal length of the set (GigaPan rigs use
+    // a fixed lens, so one value describes every frame). null → the
+    // worker falls back to a moderate default FOV. Await the Exif pass
+    // first: stitching can start before the async parse finishes, and
+    // an unread focal must not masquerade as "no Exif".
+    statusEl.textContent = 'Reading Exif metadata…';
+    await ensureExifParsed(placed.map((p) => p.entry));
+    const focals = placed.map((p) => p.entry.focal35).filter(Boolean).sort((a, b) => a - b);
+    const focal35 = focals.length ? focals[focals.length >> 1] : null;
+
     statusEl.textContent = 'Loading stitching engine (OpenCV.js WASM, ~10 MB on first run)…';
     getWorker().postMessage(
       {
@@ -141,6 +153,7 @@ async function startStitch() {
         rows: state.rows,
         cols: state.cols,
         mode: modeSelect.value,
+        focal35,
         jpegQuality: 0.92,
       },
       cells.map((c) => c.bitmap), // transfer, zero-copy

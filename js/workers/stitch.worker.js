@@ -83,6 +83,47 @@ function loadOpenCV() {
 
 const progress = (pct, note) => postMessage({ type: 'progress', pct, note });
 
+// ---- cylindrical pre-warp ------------------------------------
+// A rotating head sweeps a cylinder, but each frame is a PLANAR
+// projection: content near the frame edges is stretched relative to
+// the centre, so adjacent frames can never fully agree under a pure
+// translation — that residual shows up as misaligned railings/cars
+// at the seams. Reprojecting every frame onto the common cylinder
+// (radius = focal length in pixels) removes that systematic error;
+// what remains for the matcher really is translation.
+
+/** Build remap tables for one frame geometry (cached by caller). */
+function cylMaps(w, h, fpx) {
+  const outW = Math.max(2, Math.round(2 * fpx * Math.atan(w / (2 * fpx))));
+  const outH = h;
+  const mapX = new cv.Mat(outH, outW, cv.CV_32FC1);
+  const mapY = new cv.Mat(outH, outW, cv.CV_32FC1);
+  const cx = w / 2, cy = h / 2, ocx = outW / 2, ocy = outH / 2;
+  const dx = mapX.data32F, dy = mapY.data32F;
+  for (let yo = 0; yo < outH; yo++) {
+    for (let xo = 0; xo < outW; xo++) {
+      const theta = (xo - ocx) / fpx;          // pan angle of this column
+      const i = yo * outW + xo;
+      dx[i] = cx + fpx * Math.tan(theta);
+      dy[i] = cy + (yo - ocy) / Math.cos(theta);
+    }
+  }
+  return { mapX, mapY, outW, outH };
+}
+
+/** Warp one ImageBitmap onto the cylinder; returns an OffscreenCanvas. */
+function cylWarp(bitmap, maps) {
+  const src = matFromBitmap(bitmap, 0, 0, bitmap.width, bitmap.height);
+  const dst = new cv.Mat();
+  cv.remap(src, dst, maps.mapX, maps.mapY, cv.INTER_LINEAR,
+    cv.BORDER_CONSTANT, new cv.Scalar(0, 0, 0, 0));
+  const out = new OffscreenCanvas(maps.outW, maps.outH);
+  out.getContext('2d').putImageData(
+    new ImageData(new Uint8ClampedArray(dst.data), maps.outW, maps.outH), 0, 0);
+  src.delete(); dst.delete();
+  return out;
+}
+
 // ---- pixel access --------------------------------------------
 
 /** Crop a rect of an ImageBitmap into an RGBA cv.Mat. */
@@ -118,8 +159,12 @@ function detect(rgba) {
 function ransacTranslation(dxs, dys) {
   const n = dxs.length;
   let bestIdx = -1, bestCount = 0;
+  // Exhaustive when the candidate set fits the budget; otherwise
+  // sample randomly across the WHOLE set (indexing 0..trials would
+  // only ever test the first, query-ordered matches).
+  const exhaustive = n <= RANSAC_ITERS;
   for (let it = 0; it < Math.min(RANSAC_ITERS, n); it++) {
-    const i = it < n ? it : Math.floor(Math.random() * n);
+    const i = exhaustive ? it : Math.floor(Math.random() * n);
     let count = 0;
     for (let j = 0; j < n; j++) {
       if (Math.abs(dxs[j] - dxs[i]) <= RANSAC_TOL &&
@@ -246,8 +291,26 @@ function paintFeathered(ctx, cell, x, y, feather) {
 
 // ---- main pipeline -------------------------------------------
 
-async function stitch({ cells, rows, cols, mode, jpegQuality }) {
+async function stitch({ cells, rows, cols, mode, focal35, jpegQuality }) {
   await loadOpenCV();
+
+  // 0. Cylindrical pre-warp. Focal from Exif when available; without
+  // it assume a 50mm-equivalent (a conservative, gentle curvature —
+  // long GigaPan lenses barely bend either way).
+  const f35 = focal35 ?? 50;
+  progress(3, `Projecting ${cells.length} frame(s) onto the cylinder ` +
+    `(${focal35 ? `Exif ${f35}mm equiv.` : 'no Exif focal — assuming 50mm equiv.'})…`);
+  const mapCache = new Map(); // "w,h" → maps (all frames usually share one size)
+  for (const cell of cells) {
+    const { width: w, height: h } = cell.bitmap;
+    const key = `${w},${h}`;
+    if (!mapCache.has(key)) mapCache.set(key, cylMaps(w, h, w * f35 / 36));
+    const warped = cylWarp(cell.bitmap, mapCache.get(key));
+    cell.bitmap.close();
+    cell.bitmap = warped; // OffscreenCanvas: same width/height/drawImage surface
+  }
+  for (const m of mapCache.values()) { m.mapX.delete(); m.mapY.delete(); }
+
   progress(5, 'Engine ready — matching features…');
 
   // Index cells by grid position
@@ -416,14 +479,17 @@ async function stitch({ cells, rows, cols, mode, jpegQuality }) {
   progress(94, 'Encoding JPEG…');
   const blob = await out.convertToBlob({ type: 'image/jpeg', quality: jpegQuality ?? 0.92 });
 
-  for (const c of cells) c.bitmap.close();
+  for (const c of cells) c.bitmap.close?.(); // OffscreenCanvas has no close()
   postMessage({
     type: 'done',
     blob,
     width: out.width,
     height: out.height,
     mode,
-    pairStats: { pairs: pairs.length, fallbacks, inlierTotal },
+    pairStats: {
+      pairs: pairs.length, fallbacks, inlierTotal,
+      focal35: f35, focalFromExif: Boolean(focal35),
+    },
   });
 }
 
