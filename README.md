@@ -40,7 +40,7 @@ https://mapconcierge.github.io/PanoramaSticher/
    Click **Arrange grid** to lay the thumbnails out in a matrix. You can then drag and drop thumbnails to fix any misplacement, or remove/add images.
 3. **Shooting location** — The map (right panel) shows a draggable 📷 camera marker. When your photos contain Exif GPS, the location of the last shot is used automatically; otherwise it defaults to Tokyo Station, or your current position via the **📍 My location** button. Drag the marker to correct the location — it is written into the output JPEG's Exif.
 4. **Stitch** — Choose the output mode (**360° Equirectangular** or **Rectangle**) and click **Stitch panorama**. Feature extraction and blending run in a Web Worker using OpenCV.js (WASM).
-5. **Export** — Download the stitched panorama as a JPEG with the corrected GPS coordinates injected into its Exif. Check **"Bundle a KML PhotoOverlay for Google Earth"** to get a .kmz (KML PhotoOverlay + the JPEG) that opens directly in Google Earth.
+5. **Export** — Download the stitched panorama as a JPEG with the corrected GPS coordinates injected into its Exif. Check **"Bundle a KML PhotoOverlay for Google Earth"** to get a .kmz (KML PhotoOverlay + the JPEG) that opens directly in Google Earth. A **Download panorama PNG** button saves a lossless PNG as well (PNG carries no Exif GPS).
 
 ### Running locally
 
@@ -116,7 +116,7 @@ Taichi FURUHASHI ([@mapconcierge](https://github.com/mapconcierge)) — Furuhash
    **Arrange grid** をクリックするとサムネイルがマトリクス状に配置されます。ドラッグ&ドロップで並べ替え・削除・追加が可能です。
 3. **撮影地点（Shooting location）** — 右パネルの地図にドラッグ可能な 📷 カメラマーカーが表示されます。写真に Exif GPS がある場合は最後に撮影された 1 枚の位置が自動採用され、ない場合は東京駅、または **📍 My location** ボタンで現在地が初期位置になります。マーカーをドラッグして撮影地点を修正でき、その座標が出力 JPEG の Exif に書き込まれます。
 4. **合成（Stitch）** — 出力モード（**360° Equirectangular** / **Rectangle**）を選び **Stitch panorama** をクリックします。特徴点抽出と合成は OpenCV.js（WASM）を用いて Web Worker 内で実行されます。
-5. **書き出し（Export）** — 合成したパノラマを、修正済み GPS 座標を Exif に埋め込んだ JPEG としてダウンロードします。**"Bundle a KML PhotoOverlay for Google Earth"** にチェックを入れると、Google Earth でそのまま開ける .kmz（KML PhotoOverlay + JPEG）を出力します。
+5. **書き出し（Export）** — 合成したパノラマを、修正済み GPS 座標を Exif に埋め込んだ JPEG としてダウンロードします。**"Bundle a KML PhotoOverlay for Google Earth"** にチェックを入れると、Google Earth でそのまま開ける .kmz（KML PhotoOverlay + JPEG）を出力します。**Download panorama PNG** ボタンでロスレス PNG も保存できます（PNG には Exif GPS は入りません）。
 
 ### ローカルでの実行
 
