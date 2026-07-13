@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — Exif GPS / timestamp parsing (Phase 3)
+// GigaPanoStitcher — Exif GPS / timestamp parsing (Phase 3)
 // =========================================================
 // Reads DateTimeOriginal and GPS from every loaded JPEG via
 // exifr (loaded from CDN as window.exifr). Per the spec, the

@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — GigaPan shooting-pattern → grid logic
+// GigaPanoStitcher — GigaPan shooting-pattern → grid logic
 // =========================================================
 // Maps a capture-sequence index k (0-based, file order) to a
 // (row, col) cell in the panorama grid.

@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — drag-and-drop / file-picker intake
+// GigaPanoStitcher — drag-and-drop / file-picker intake
 // =========================================================
 
 import { MAX_IMAGES, ACCEPTED_TYPES, THUMB_SIZE } from './config.js';

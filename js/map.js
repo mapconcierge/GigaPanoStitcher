@@ -1,5 +1,5 @@
 // =========================================================
-// PanoramaStitcher — Leaflet map + draggable camera marker
+// GigaPanoStitcher — Leaflet map + draggable camera marker
 // =========================================================
 // All coordinates are WGS84 (EPSG:4326); Leaflet renders in
 // Web Mercator (EPSG:3857) internally.
