@@ -15,9 +15,9 @@
   <!-- exifr 7.1.3 : Exif GPS / timestamp reading (Phase 3) -->
   <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"
           integrity="sha384-KrOocIA+lZcNUz2MDavnT/FuX+CbTREJihUi0bp8QUSwhE2AkGTNpv2b7yMbBkx5" crossorigin="anonymous"></script>
-  <!-- piexifjs 1.0.6 : Exif GPS writing into the stitched JPEG (Phase 5) -->
-  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"
-          integrity="sha384-pQscxfezjt6vZacoDAQEvU7OYak0dB/9o/VoBbzD8SrYGu63hWctWY25MxxIXSAX" crossorigin="anonymous"></script>
+  <!-- Exif writing: dependency-free js/exifwriter.js — no CDN script.
+       (A silently blocked piexif.min.js used to kill export preparation:
+       "piexif is not defined".) -->
   <!-- JSZip 3.10.1 : JPEG + KML bundling (Phase 5) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
           integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>

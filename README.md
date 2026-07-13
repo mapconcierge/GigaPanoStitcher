@@ -61,7 +61,7 @@ python3 -m http.server 8080
 |---------|---------|-------|
 | Map | [Leaflet](https://leafletjs.com/) 1.9.4 + OpenStreetMap standard layer | WGS84 (EPSG:4326) coordinates |
 | Exif reading | [exifr](https://github.com/MikeKovarik/exifr) 7.1.3 | GPS + DateTimeOriginal |
-| Exif writing | [piexifjs](https://github.com/hMatoba/piexifjs) 1.0.6 | GPS injection into output JPEG |
+| Exif writing | built-in (`js/exifwriter.js`, dependency-free) | GPS injection into output JPEG |
 | Archiving | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | .kmz (KML + JPEG) bundling |
 | Computer vision | OpenCV.js 4.10.0 (WASM, vendored) | Loaded in a Web Worker on first stitch |
 
@@ -137,7 +137,7 @@ python3 -m http.server 8080
 |------|-----------|------|
 | 地図 | [Leaflet](https://leafletjs.com/) 1.9.4 + OpenStreetMap 標準レイヤ | 座標系は WGS84（EPSG:4326） |
 | Exif 読み込み | [exifr](https://github.com/MikeKovarik/exifr) 7.1.3 | GPS + DateTimeOriginal |
-| Exif 書き込み | [piexifjs](https://github.com/hMatoba/piexifjs) 1.0.6 | 出力 JPEG への GPS 埋め込み |
+| Exif 書き込み | 内蔵ライタ（`js/exifwriter.js`・依存なし） | 出力 JPEG への GPS 埋め込み |
 | アーカイブ | [JSZip](https://stuk.github.io/jszip/) 3.10.1 | .kmz（KML + JPEG）生成 |
 | 画像処理 | OpenCV.js 4.10.0（WASM・同梱） | 初回スティッチ時に Web Worker 内でロード |
 
