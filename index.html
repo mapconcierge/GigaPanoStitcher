@@ -141,8 +141,14 @@
               Bundle a KML PhotoOverlay for Google Earth (.kmz with the JPEG inside)</label>
           </div>
           <div class="field-row">
-            <button id="download-btn" class="btn btn-primary" disabled
-                    title="Available after stitching">Download panorama JPEG</button>
+            <!-- Real anchors, armed with blob URLs at prepare time: the
+                 user's click is a native link download with no JS in the
+                 activation path (programmatic a.click() gets silently
+                 blocked by some browsers/extensions). -->
+            <a id="download-btn" class="btn btn-primary" role="button" aria-disabled="true"
+               title="Available after stitching">Download panorama JPEG</a>
+            <a id="download-png-btn" class="btn btn-primary" role="button" aria-disabled="true"
+               title="Available after stitching (PNG carries no Exif GPS)">Download panorama PNG</a>
           </div>
           <p id="export-status" class="muted"></p>
         </div>

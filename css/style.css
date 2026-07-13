@@ -159,22 +159,30 @@ body {
 
 /* ===== Buttons ===== */
 .btn {
+  display: inline-block;
   padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #fff;
   cursor: pointer;
   font-size: 0.85rem;
+  text-decoration: none;
+  color: inherit;
 }
-.btn:hover:not(:disabled) { background: #f0f2f5; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover:not(:disabled):not([aria-disabled="true"]) { background: #f0f2f5; }
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
 }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--accent-hover); }
 
 .btn-small { padding: 3px 10px; font-size: 0.78rem; }
 

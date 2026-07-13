@@ -16,6 +16,7 @@ import { state, on } from './state.js';
 /* global piexif, JSZip */
 
 const downloadBtn = document.getElementById('download-btn');
+const downloadPngBtn = document.getElementById('download-png-btn');
 const kmlCheckbox = document.getElementById('kml-checkbox');
 const statusEl = document.getElementById('export-status');
 
@@ -125,93 +126,120 @@ export function buildKml(jpgHref, name) {
 
 // ---- download ------------------------------------------------
 
-function triggerDownload(blob, filename) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-}
-
 function stampName() {
   const d = new Date();
   return `panorama_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}` +
          `-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
 }
 
-// The Exif-injected JPEG is prepared ahead of time (when a result
-// lands or the marker moves) so the click handler can hand the file
-// to the browser while the user gesture is still "fresh" — browsers
-// drop programmatic downloads whose transient activation expired,
-// which is exactly what happened when a large panorama spent seconds
-// inside piexif before the a.click().
-let prepared = null; // Exif-injected JPEG blob
+// Every export artifact (Exif JPEG, KMZ, PNG) is built AHEAD of the
+// click and armed onto a real <a download> anchor. The user's click
+// is then a plain native link download with zero JavaScript in the
+// activation path. A programmatic a.click(), which earlier versions
+// used, is silently swallowed by some browsers/extensions — the app
+// saw "success" while no file ever landed (the GitHub Pages bug).
+let exportName = '';
+let urls = { main: null, png: null }; // armed object URLs
 let prepToken = 0;
 
-async function prepareJpeg() {
-  // Invalidate synchronously: a stale blob from a previous result or
-  // marker position must never be downloadable, so the button stays
-  // disabled until THIS preparation lands.
-  prepared = null;
-  downloadBtn.disabled = true;
-  if (!state.result) return null;
-  const token = ++prepToken;
-  setStatus('Preparing export…');
-  try {
-    const jpeg = await injectExif(state.result.blob);
-    if (token !== prepToken) return null; // superseded meanwhile
-    prepared = jpeg;
-    downloadBtn.disabled = false;
-    setStatus(`Ready to download (${Math.round(jpeg.size / 1024 / 1024 * 10) / 10} MB).`);
-    return jpeg;
-  } catch (err) {
-    if (token === prepToken) {
-      // Re-enable so the user can retry from the click handler;
-      // the failure is visible in the status line.
-      downloadBtn.disabled = false;
-      setStatus(`Export preparation failed: ${err.message}`);
-    }
-    return null;
+function disarm(anchor) {
+  anchor.removeAttribute('href');
+  anchor.removeAttribute('download');
+  anchor.setAttribute('aria-disabled', 'true');
+}
+
+function arm(anchor, blob, filename) {
+  const url = URL.createObjectURL(blob);
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.removeAttribute('aria-disabled');
+  return url;
+}
+
+function revokeArmed() {
+  for (const k of Object.keys(urls)) {
+    if (urls[k]) URL.revokeObjectURL(urls[k]);
+    urls[k] = null;
   }
 }
 
-async function download() {
-  if (!state.result) return;
-  try {
-    const name = stampName();
-    // Use the pre-built JPEG when available; only rebuild if the
-    // preparation is still running or previously failed.
-    const jpeg = prepared ?? await prepareJpeg();
-    if (!jpeg) return; // prepareJpeg already reported the error
+/** Arm the main anchor: plain JPEG, or KMZ when the KML box is on. */
+async function armMainAnchor(jpeg) {
+  if (kmlCheckbox.checked) {
+    const zip = new JSZip();
+    zip.file('doc.kml', buildKml(`files/${exportName}.jpg`, exportName));
+    // STORE: JPEG doesn't deflate — keeps KMZ generation fast
+    zip.folder('files').file(`${exportName}.jpg`, jpeg, { compression: 'STORE' });
+    const kmz = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.google-earth.kmz',
+    });
+    return arm(downloadBtn, kmz, `${exportName}.kmz`);
+  }
+  return arm(downloadBtn, jpeg, `${exportName}.jpg`);
+}
 
-    if (kmlCheckbox.checked) {
-      const zip = new JSZip();
-      zip.file('doc.kml', buildKml(`files/${name}.jpg`, name));
-      // STORE: JPEG doesn't deflate — skipping compression keeps the
-      // KMZ generation fast enough to stay inside the gesture window.
-      zip.folder('files').file(`${name}.jpg`, jpeg, { compression: 'STORE' });
-      const kmz = await zip.generateAsync({
-        type: 'blob',
-        mimeType: 'application/vnd.google-earth.kmz',
-      });
-      triggerDownload(kmz, `${name}.kmz`);
-      setStatus(`Saved ${name}.kmz — open it in Google Earth.`);
-    } else {
-      triggerDownload(jpeg, `${name}.jpg`);
-      setStatus(`Saved ${name}.jpg.`);
-    }
+/** PNG re-encoded from the displayed result canvas (no Exif in PNG). */
+function resultPngBlob() {
+  const canvas = document.getElementById('result-canvas');
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encode failed'))), 'image/png');
+  });
+}
+
+let preparedJpeg = null; // kept for KMZ re-arming on checkbox toggle
+
+async function prepareExports() {
+  // Invalidate synchronously: stale artifacts from a previous result
+  // or marker position must never stay downloadable.
+  preparedJpeg = null;
+  disarm(downloadBtn);
+  disarm(downloadPngBtn);
+  revokeArmed();
+  if (!state.result) return;
+  const token = ++prepToken;
+  exportName = stampName();
+  setStatus('Preparing export…');
+  try {
+    const jpeg = await injectExif(state.result.blob);
+    if (token !== prepToken) return;
+    preparedJpeg = jpeg;
+    urls.main = await armMainAnchor(jpeg);
+    if (token !== prepToken) return;
+    setStatus(`Ready to download (${(jpeg.size / 1024 / 1024).toFixed(1)} MB JPEG). Encoding PNG…`);
+
+    const png = await resultPngBlob(); // slow for large panoramas
+    if (token !== prepToken) return;
+    urls.png = arm(downloadPngBtn, png, `${exportName}.png`);
+    setStatus(`Ready to download — JPEG ${(jpeg.size / 1024 / 1024).toFixed(1)} MB / ` +
+              `PNG ${(png.size / 1024 / 1024).toFixed(1)} MB (PNG carries no Exif GPS).`);
   } catch (err) {
-    setStatus(`Download failed: ${err.message}`);
+    if (token === prepToken) setStatus(`Export preparation failed: ${err.message}`);
   }
 }
 
 export function initExport() {
-  downloadBtn.addEventListener('click', download);
-  // prepareJpeg gates the button itself: disabled while (re)building,
-  // enabled once the JPEG for the current result/location is ready.
-  on('result', prepareJpeg);
+  on('result', prepareExports);
   // Marker moved after stitching → the Exif coordinates must follow
-  on('location', () => { if (state.result) prepareJpeg(); });
+  on('location', () => { if (state.result) prepareExports(); });
+
+  // KML toggle swaps the main anchor between .jpg and .kmz
+  kmlCheckbox.addEventListener('change', async () => {
+    if (!preparedJpeg) return;
+    disarm(downloadBtn);
+    if (urls.main) { URL.revokeObjectURL(urls.main); urls.main = null; }
+    try {
+      urls.main = await armMainAnchor(preparedJpeg);
+    } catch (err) {
+      setStatus(`Export preparation failed: ${err.message}`);
+    }
+  });
+
+  // Native downloads need no JS — these only update the status line
+  downloadBtn.addEventListener('click', () => {
+    if (downloadBtn.hasAttribute('href')) setStatus(`Saved ${downloadBtn.download}.`);
+  });
+  downloadPngBtn.addEventListener('click', () => {
+    if (downloadPngBtn.hasAttribute('href')) setStatus(`Saved ${downloadPngBtn.download}.`);
+  });
 }
