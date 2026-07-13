@@ -118,8 +118,12 @@ function detect(rgba) {
 function ransacTranslation(dxs, dys) {
   const n = dxs.length;
   let bestIdx = -1, bestCount = 0;
+  // Exhaustive when the candidate set fits the budget; otherwise
+  // sample randomly across the WHOLE set (indexing 0..trials would
+  // only ever test the first, query-ordered matches).
+  const exhaustive = n <= RANSAC_ITERS;
   for (let it = 0; it < Math.min(RANSAC_ITERS, n); it++) {
-    const i = it < n ? it : Math.floor(Math.random() * n);
+    const i = exhaustive ? it : Math.floor(Math.random() * n);
     let count = 0;
     for (let j = 0; j < n; j++) {
       if (Math.abs(dxs[j] - dxs[i]) <= RANSAC_TOL &&

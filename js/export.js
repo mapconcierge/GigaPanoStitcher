@@ -149,17 +149,26 @@ let prepared = null; // Exif-injected JPEG blob
 let prepToken = 0;
 
 async function prepareJpeg() {
-  if (!state.result) { prepared = null; return null; }
+  // Invalidate synchronously: a stale blob from a previous result or
+  // marker position must never be downloadable, so the button stays
+  // disabled until THIS preparation lands.
+  prepared = null;
+  downloadBtn.disabled = true;
+  if (!state.result) return null;
   const token = ++prepToken;
+  setStatus('Preparing export…');
   try {
     const jpeg = await injectExif(state.result.blob);
     if (token !== prepToken) return null; // superseded meanwhile
     prepared = jpeg;
+    downloadBtn.disabled = false;
     setStatus(`Ready to download (${Math.round(jpeg.size / 1024 / 1024 * 10) / 10} MB).`);
     return jpeg;
   } catch (err) {
     if (token === prepToken) {
-      prepared = null;
+      // Re-enable so the user can retry from the click handler;
+      // the failure is visible in the status line.
+      downloadBtn.disabled = false;
       setStatus(`Export preparation failed: ${err.message}`);
     }
     return null;
@@ -198,11 +207,9 @@ async function download() {
 
 export function initExport() {
   downloadBtn.addEventListener('click', download);
-  on('result', () => {
-    downloadBtn.disabled = false;
-    setStatus('Preparing export…');
-    prepareJpeg();
-  });
+  // prepareJpeg gates the button itself: disabled while (re)building,
+  // enabled once the JPEG for the current result/location is ready.
+  on('result', prepareJpeg);
   // Marker moved after stitching → the Exif coordinates must follow
   on('location', () => { if (state.result) prepareJpeg(); });
 }
