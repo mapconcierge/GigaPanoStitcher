@@ -41,13 +41,18 @@ const OPENCV_URL = '../vendor/opencv-4.10.0.js';
 /** Fraction of each frame searched for features along a shared edge. */
 const STRIP_FRAC = 0.5;
 /** ORB feature budget per strip. */
-const ORB_FEATURES = 800;
+const ORB_FEATURES = 1200;
 /** Lowe ratio-test threshold. */
 const RATIO = 0.75;
 /** Minimum surviving matches for a pair offset to be trusted. */
 const MIN_MATCHES = 8;
 /** Assumed overlap fraction when matching fails (GigaPan default ~30%). */
 const FALLBACK_OVERLAP = 0.3;
+/** RANSAC iterations / inlier radius (px) for pair-offset estimation. */
+const RANSAC_ITERS = 300;
+const RANSAC_TOL = 3;
+/** Iterations of the global position relaxation solve. */
+const RELAX_ITERS = 120;
 
 let cvReadyPromise = null;
 
@@ -103,19 +108,42 @@ function detect(rgba) {
   return { kp, des };
 }
 
-const median = (arr) => {
-  const s = [...arr].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
+/**
+ * RANSAC over 2D translations: pick the delta supported by the most
+ * matches, then refine as the inlier mean. Robust against the
+ * multi-modal delta distributions that repeated structures and
+ * parallax produce (where a plain median lands between modes and
+ * ghosts the whole seam).
+ */
+function ransacTranslation(dxs, dys) {
+  const n = dxs.length;
+  let bestIdx = -1, bestCount = 0;
+  for (let it = 0; it < Math.min(RANSAC_ITERS, n); it++) {
+    const i = it < n ? it : Math.floor(Math.random() * n);
+    let count = 0;
+    for (let j = 0; j < n; j++) {
+      if (Math.abs(dxs[j] - dxs[i]) <= RANSAC_TOL &&
+          Math.abs(dys[j] - dys[i]) <= RANSAC_TOL) count++;
+    }
+    if (count > bestCount) { bestCount = count; bestIdx = i; }
+  }
+  if (bestIdx < 0 || bestCount < MIN_MATCHES) return null;
+  let sx = 0, sy = 0;
+  for (let j = 0; j < n; j++) {
+    if (Math.abs(dxs[j] - dxs[bestIdx]) <= RANSAC_TOL &&
+        Math.abs(dys[j] - dys[bestIdx]) <= RANSAC_TOL) { sx += dxs[j]; sy += dys[j]; }
+  }
+  return { dx: sx / bestCount, dy: sy / bestCount, inliers: bestCount };
+}
 
 /**
- * Robust translation between two strips: median match delta with
- * one MAD-based rejection pass. Returns null when unreliable.
+ * Robust translation between two strips. Candidate deltas are
+ * pre-filtered to the geometrically possible window (`expect`),
+ * then RANSAC picks the dominant mode. Returns null when unreliable.
  * Deltas are expressed in GLOBAL frame coordinates of each image
- * (strip origins are added back by the caller via ax/ay/bx/by).
+ * (strip origins are added back via ax/ay/bx/by).
  */
-function stripOffset(stripA, stripB, ax, ay, bx, by) {
+function stripOffset(stripA, stripB, ax, ay, bx, by, expect) {
   const A = detect(stripA);
   const B = detect(stripB);
   let result = null;
@@ -133,28 +161,18 @@ function stripOffset(stripA, stripB, ax, ay, bx, by) {
       if (m.distance < RATIO * n.distance) {
         const pa = A.kp.get(m.queryIdx).pt;
         const pb = B.kp.get(m.trainIdx).pt;
-        dxs.push((ax + pa.x) - (bx + pb.x));
-        dys.push((ay + pa.y) - (by + pb.y));
+        const dx = (ax + pa.x) - (bx + pb.x);
+        const dy = (ay + pa.y) - (by + pb.y);
+        if (dx >= expect.minDx && dx <= expect.maxDx &&
+            dy >= expect.minDy && dy <= expect.maxDy) {
+          dxs.push(dx);
+          dys.push(dy);
+        }
       }
     }
     bf.delete(); knn.delete();
 
-    if (dxs.length >= MIN_MATCHES) {
-      // MAD outlier rejection, then re-median
-      const mx = median(dxs), my = median(dys);
-      const madX = median(dxs.map((v) => Math.abs(v - mx))) || 1;
-      const madY = median(dys.map((v) => Math.abs(v - my))) || 1;
-      const inX = [], inY = [];
-      for (let i = 0; i < dxs.length; i++) {
-        if (Math.abs(dxs[i] - mx) <= 3 * madX && Math.abs(dys[i] - my) <= 3 * madY) {
-          inX.push(dxs[i]);
-          inY.push(dys[i]);
-        }
-      }
-      if (inX.length >= MIN_MATCHES) {
-        result = { dx: median(inX), dy: median(inY), inliers: inX.length };
-      }
-    }
+    if (dxs.length >= MIN_MATCHES) result = ransacTranslation(dxs, dys);
   }
   A.kp.delete(); A.des.delete(); B.kp.delete(); B.des.delete();
   return result;
@@ -166,27 +184,35 @@ function stripOffset(stripA, stripB, ax, ay, bx, by) {
  * Returns {dx, dy, inliers|0, fallback:boolean}.
  */
 function pairOffset(a, b, axis) {
-  const stripWA = Math.round((axis === 'h' ? a.bitmap.width : a.bitmap.height) * STRIP_FRAC);
+  const w = a.bitmap.width, h = a.bitmap.height;
+  // Geometrically possible window for the neighbor's displacement:
+  // it must lie ahead along the pan/tilt axis (5–98% of the frame)
+  // and only drift moderately on the perpendicular axis.
+  const expect = axis === 'h'
+    ? { minDx: 0.05 * w, maxDx: 0.98 * w, minDy: -0.45 * h, maxDy: 0.45 * h }
+    : { minDx: -0.45 * w, maxDx: 0.45 * w, minDy: 0.05 * h, maxDy: 0.98 * h };
+
+  const stripWA = Math.round((axis === 'h' ? w : h) * STRIP_FRAC);
   const stripWB = Math.round((axis === 'h' ? b.bitmap.width : b.bitmap.height) * STRIP_FRAC);
   let sa, sb, off = null;
   if (axis === 'h') {
-    const ax = a.bitmap.width - stripWA;
-    sa = matFromBitmap(a.bitmap, ax, 0, stripWA, a.bitmap.height);
+    const ax = w - stripWA;
+    sa = matFromBitmap(a.bitmap, ax, 0, stripWA, h);
     sb = matFromBitmap(b.bitmap, 0, 0, stripWB, b.bitmap.height);
-    off = stripOffset(sa, sb, ax, 0, 0, 0);
+    off = stripOffset(sa, sb, ax, 0, 0, 0, expect);
   } else {
-    const ay = a.bitmap.height - stripWA;
-    sa = matFromBitmap(a.bitmap, 0, ay, a.bitmap.width, stripWA);
+    const ay = h - stripWA;
+    sa = matFromBitmap(a.bitmap, 0, ay, w, stripWA);
     sb = matFromBitmap(b.bitmap, 0, 0, b.bitmap.width, stripWB);
-    off = stripOffset(sa, sb, 0, ay, 0, 0);
+    off = stripOffset(sa, sb, 0, ay, 0, 0, expect);
   }
   sa.delete(); sb.delete();
 
   if (off) return { ...off, fallback: false };
   // Fallback: nominal GigaPan overlap
   return axis === 'h'
-    ? { dx: Math.round(a.bitmap.width * (1 - FALLBACK_OVERLAP)), dy: 0, inliers: 0, fallback: true }
-    : { dx: 0, dy: Math.round(a.bitmap.height * (1 - FALLBACK_OVERLAP)), inliers: 0, fallback: true };
+    ? { dx: Math.round(w * (1 - FALLBACK_OVERLAP)), dy: 0, inliers: 0, fallback: true }
+    : { dx: 0, dy: Math.round(h * (1 - FALLBACK_OVERLAP)), inliers: 0, fallback: true };
 }
 
 // ---- compositing ---------------------------------------------
@@ -285,6 +311,39 @@ async function stitch({ cells, rows, cols, mode, jpegQuality }) {
     }
   }
 
+  // 3b. Global relaxation: the row-major pass above accumulates error
+  // along its traversal order; iterating a weighted average over ALL
+  // pair constraints (matched pairs count fully, fallbacks barely)
+  // distributes the residuals evenly instead of piling them up in the
+  // last row/column.
+  const constraints = []; // {aId, bId, dx, dy, w}
+  for (const [key, o] of hOff) {
+    const [r, c] = key.split(',').map(Number);
+    constraints.push({ a: at(r, c).id, b: at(r, c + 1).id, dx: o.dx, dy: o.dy, w: o.fallback ? 0.2 : 1 });
+  }
+  for (const [key, o] of vOff) {
+    const [r, c] = key.split(',').map(Number);
+    constraints.push({ a: at(r, c).id, b: at(r + 1, c).id, dx: o.dx, dy: o.dy, w: o.fallback ? 0.2 : 1 });
+  }
+  const anchorId = cells[0].id;
+  for (let it = 0; it < RELAX_ITERS; it++) {
+    const acc = new Map(); // id → {x, y, w}
+    const push = (id, x, y, w) => {
+      const a = acc.get(id) ?? { x: 0, y: 0, w: 0 };
+      a.x += x * w; a.y += y * w; a.w += w;
+      acc.set(id, a);
+    };
+    for (const c of constraints) {
+      const pa = pos.get(c.a), pb = pos.get(c.b);
+      push(c.b, pa.x + c.dx, pa.y + c.dy, c.w);
+      push(c.a, pb.x - c.dx, pb.y - c.dy, c.w);
+    }
+    for (const [id, a] of acc) {
+      if (id === anchorId || !a.w) continue;
+      pos.set(id, { x: a.x / a.w, y: a.y / a.w });
+    }
+  }
+
   // 4. Composite with feathering
   progress(72, 'Compositing…');
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -299,20 +358,30 @@ async function stitch({ cells, rows, cols, mode, jpegQuality }) {
   const mosaic = new OffscreenCanvas(mosaicW, mosaicH);
   const mctx = mosaic.getContext('2d');
 
+  // Blend only a narrow band near each seam instead of the full
+  // overlap: wide feathers turn any residual misalignment into a
+  // large semi-transparent ghost zone, whereas beyond the band the
+  // later-drawn frame simply covers its neighbor opaquely.
+  const blendBand = (edgePx) => Math.min(Math.max(0.06 * edgePx, 16), 48);
+
   const featherFor = (r, c, cell) => {
     const f = { left: 0, right: 0, top: 0, bottom: 0 };
     const ov = (o, axis, dim) => Math.max(0, dim - Math.abs(axis === 'h' ? o.dx : o.dy));
     if (at(r, c - 1) && hOff.has(`${r},${c - 1}`)) {
-      f.left = ov(hOff.get(`${r},${c - 1}`), 'h', at(r, c - 1).bitmap.width) / 2;
+      const overlap = ov(hOff.get(`${r},${c - 1}`), 'h', at(r, c - 1).bitmap.width);
+      f.left = Math.min(overlap / 2, blendBand(cell.bitmap.width));
     }
     if (at(r, c + 1) && hOff.has(`${r},${c}`)) {
-      f.right = ov(hOff.get(`${r},${c}`), 'h', cell.bitmap.width) / 2;
+      const overlap = ov(hOff.get(`${r},${c}`), 'h', cell.bitmap.width);
+      f.right = Math.min(overlap / 2, blendBand(cell.bitmap.width));
     }
     if (at(r - 1, c) && vOff.has(`${r - 1},${c}`)) {
-      f.top = ov(vOff.get(`${r - 1},${c}`), 'v', at(r - 1, c).bitmap.height) / 2;
+      const overlap = ov(vOff.get(`${r - 1},${c}`), 'v', at(r - 1, c).bitmap.height);
+      f.top = Math.min(overlap / 2, blendBand(cell.bitmap.height));
     }
     if (at(r + 1, c) && vOff.has(`${r},${c}`)) {
-      f.bottom = ov(vOff.get(`${r},${c}`), 'v', cell.bitmap.height) / 2;
+      const overlap = ov(vOff.get(`${r},${c}`), 'v', cell.bitmap.height);
+      f.bottom = Math.min(overlap / 2, blendBand(cell.bitmap.height));
     }
     return f;
   };

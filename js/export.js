@@ -17,6 +17,9 @@ import { state, on } from './state.js';
 
 const downloadBtn = document.getElementById('download-btn');
 const kmlCheckbox = document.getElementById('kml-checkbox');
+const statusEl = document.getElementById('export-status');
+
+const setStatus = (msg) => { statusEl.textContent = msg; };
 
 // ---- binary helpers (piexifjs works on binary strings) -------
 
@@ -136,33 +139,70 @@ function stampName() {
          `-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
 }
 
+// The Exif-injected JPEG is prepared ahead of time (when a result
+// lands or the marker moves) so the click handler can hand the file
+// to the browser while the user gesture is still "fresh" — browsers
+// drop programmatic downloads whose transient activation expired,
+// which is exactly what happened when a large panorama spent seconds
+// inside piexif before the a.click().
+let prepared = null; // Exif-injected JPEG blob
+let prepToken = 0;
+
+async function prepareJpeg() {
+  if (!state.result) { prepared = null; return null; }
+  const token = ++prepToken;
+  try {
+    const jpeg = await injectExif(state.result.blob);
+    if (token !== prepToken) return null; // superseded meanwhile
+    prepared = jpeg;
+    setStatus(`Ready to download (${Math.round(jpeg.size / 1024 / 1024 * 10) / 10} MB).`);
+    return jpeg;
+  } catch (err) {
+    if (token === prepToken) {
+      prepared = null;
+      setStatus(`Export preparation failed: ${err.message}`);
+    }
+    return null;
+  }
+}
+
 async function download() {
   if (!state.result) return;
-  downloadBtn.disabled = true;
-  const label = downloadBtn.textContent;
-  downloadBtn.textContent = 'Preparing…';
   try {
     const name = stampName();
-    const jpeg = await injectExif(state.result.blob);
+    // Use the pre-built JPEG when available; only rebuild if the
+    // preparation is still running or previously failed.
+    const jpeg = prepared ?? await prepareJpeg();
+    if (!jpeg) return; // prepareJpeg already reported the error
+
     if (kmlCheckbox.checked) {
       const zip = new JSZip();
       zip.file('doc.kml', buildKml(`files/${name}.jpg`, name));
-      zip.folder('files').file(`${name}.jpg`, jpeg);
+      // STORE: JPEG doesn't deflate — skipping compression keeps the
+      // KMZ generation fast enough to stay inside the gesture window.
+      zip.folder('files').file(`${name}.jpg`, jpeg, { compression: 'STORE' });
       const kmz = await zip.generateAsync({
         type: 'blob',
         mimeType: 'application/vnd.google-earth.kmz',
       });
       triggerDownload(kmz, `${name}.kmz`);
+      setStatus(`Saved ${name}.kmz — open it in Google Earth.`);
     } else {
       triggerDownload(jpeg, `${name}.jpg`);
+      setStatus(`Saved ${name}.jpg.`);
     }
-  } finally {
-    downloadBtn.textContent = label;
-    downloadBtn.disabled = false;
+  } catch (err) {
+    setStatus(`Download failed: ${err.message}`);
   }
 }
 
 export function initExport() {
   downloadBtn.addEventListener('click', download);
-  on('result', () => { downloadBtn.disabled = false; });
+  on('result', () => {
+    downloadBtn.disabled = false;
+    setStatus('Preparing export…');
+    prepareJpeg();
+  });
+  // Marker moved after stitching → the Exif coordinates must follow
+  on('location', () => { if (state.result) prepareJpeg(); });
 }
