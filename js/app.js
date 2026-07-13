@@ -15,11 +15,13 @@ import { initExif } from './exif.js';
 import { initStitch } from './stitch.js';
 import { initExport } from './export.js';
 import { state, on } from './state.js';
+import { APP_VERSION } from './config.js';
 
 const applyMatrixBtn = document.getElementById('apply-matrix-btn');
 const stitchStatus = document.getElementById('stitch-status');
 
 function init() {
+  document.getElementById('app-version').textContent = `v${APP_VERSION}`;
   initUpload();
   initMap();
   initMatrix();

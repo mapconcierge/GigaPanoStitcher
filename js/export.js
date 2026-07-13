@@ -21,25 +21,6 @@ const statusEl = document.getElementById('export-status');
 
 const setStatus = (msg) => { statusEl.textContent = msg; };
 
-// ---- binary helpers (piexifjs works on binary strings) -------
-
-const CHUNK = 0x8000;
-
-function blobToBinaryString(buf) {
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-  }
-  return bin;
-}
-
-function binaryStringToBlob(bin, type) {
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type });
-}
-
 // ---- Exif ----------------------------------------------------
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -53,9 +34,17 @@ function sourceCaptureTime() {
          `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
-/** Inject the marker position (+ metadata) into the stitched JPEG. */
+/**
+ * Inject the marker position (+ metadata) into the stitched JPEG.
+ *
+ * piexif.dump builds only the (sub-kilobyte) Exif payload string; the
+ * APP1 segment is then spliced into the JPEG at the byte level via
+ * Blob composition. piexif.insert would instead round-trip the WHOLE
+ * multi-megabyte JPEG through JS binary strings — hundreds of MB of
+ * peak memory on real panoramas, which is exactly the kind of load
+ * that made the export die silently on some machines.
+ */
 export async function injectExif(blob) {
-  const bin = blobToBinaryString(await blob.arrayBuffer());
   const { lat, lng } = state.location;
 
   const zeroth = {};
@@ -72,8 +61,21 @@ export async function injectExif(blob) {
   gps[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lng));
   gps[piexif.GPSIFD.GPSMapDatum] = 'WGS-84';
 
-  const exifBytes = piexif.dump({ '0th': zeroth, 'Exif': exif, 'GPS': gps });
-  return binaryStringToBlob(piexif.insert(exifBytes, bin), 'image/jpeg');
+  // "Exif\0\0" + TIFF block, as a small binary string → bytes
+  const payloadStr = piexif.dump({ '0th': zeroth, 'Exif': exif, 'GPS': gps });
+  const payload = new Uint8Array(payloadStr.length);
+  for (let i = 0; i < payloadStr.length; i++) payload[i] = payloadStr.charCodeAt(i) & 0xff;
+
+  // APP1 header: marker FF E1 + big-endian length (payload + the 2 length bytes)
+  const segLen = payload.length + 2;
+  const header = new Uint8Array([0xff, 0xe1, (segLen >> 8) & 0xff, segLen & 0xff]);
+
+  // Sanity: canvas encoders emit SOI first (FF D8); splice right after it
+  const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  if (head[0] !== 0xff || head[1] !== 0xd8) {
+    throw new Error('Stitched blob is not a JPEG (missing SOI marker)');
+  }
+  return new Blob([head, header, payload, blob.slice(2)], { type: 'image/jpeg' });
 }
 
 // ---- KML PhotoOverlay ----------------------------------------

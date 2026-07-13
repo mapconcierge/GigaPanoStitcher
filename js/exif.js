@@ -20,10 +20,15 @@ async function parseEntry(entry) {
   entry.exifParsed = true;
   try {
     const [meta, gps] = await Promise.all([
-      exifr.parse(entry.file, { pick: ['DateTimeOriginal', 'CreateDate'] }),
+      exifr.parse(entry.file, {
+        pick: ['DateTimeOriginal', 'CreateDate', 'FocalLengthIn35mmFormat'],
+      }),
       exifr.gps(entry.file),
     ]);
     entry.takenAt = meta?.DateTimeOriginal ?? meta?.CreateDate ?? null;
+    // 35mm-equivalent focal length drives the cylindrical pre-warp
+    entry.focal35 = Number.isFinite(meta?.FocalLengthIn35mmFormat)
+      ? meta.FocalLengthIn35mmFormat : null;
     if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude)) {
       entry.gps = { lat: gps.latitude, lng: gps.longitude };
     }
