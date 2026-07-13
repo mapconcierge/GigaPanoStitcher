@@ -2,8 +2,10 @@
 // PanoramaStitcher — export: Exif injection + KML PhotoOverlay
 // =========================================================
 // The stitched JPEG gets the (possibly user-corrected) shooting
-// location written into its Exif GPS tags via piexifjs, plus a
-// Software tag and the capture time of the source set.
+// location written into its Exif GPS tags, plus a Software tag and
+// the capture time of the source set. The Exif APP1 segment is built
+// by our own dependency-free writer (js/exifwriter.js) — the export
+// path must never hinge on a CDN script being loaded.
 //
 // With the KML option enabled, the download is a .kmz —
 // a zip holding doc.kml (a <PhotoOverlay>) and files/<jpg> —
@@ -12,8 +14,9 @@
 // Coordinates are WGS84 (EPSG:4326) — Exif GPS and KML both use it.
 
 import { state, on } from './state.js';
+import { buildExifApp1 } from './exifwriter.js';
 
-/* global piexif, JSZip */
+/* global JSZip */
 
 const downloadBtn = document.getElementById('download-btn');
 const downloadPngBtn = document.getElementById('download-png-btn');
@@ -37,46 +40,25 @@ function sourceCaptureTime() {
 
 /**
  * Inject the marker position (+ metadata) into the stitched JPEG.
- *
- * piexif.dump builds only the (sub-kilobyte) Exif payload string; the
- * APP1 segment is then spliced into the JPEG at the byte level via
- * Blob composition. piexif.insert would instead round-trip the WHOLE
- * multi-megabyte JPEG through JS binary strings — hundreds of MB of
- * peak memory on real panoramas, which is exactly the kind of load
- * that made the export die silently on some machines.
+ * The APP1 segment (sub-kilobyte, built in pure JS) is spliced right
+ * after SOI via Blob composition — near zero-copy regardless of the
+ * panorama size.
  */
 export async function injectExif(blob) {
   const { lat, lng } = state.location;
-
-  const zeroth = {};
-  zeroth[piexif.ImageIFD.Software] = 'PanoramaStitcher';
-
-  const exif = {};
-  const dto = sourceCaptureTime();
-  if (dto) exif[piexif.ExifIFD.DateTimeOriginal] = dto;
-
-  const gps = {};
-  gps[piexif.GPSIFD.GPSLatitudeRef] = lat >= 0 ? 'N' : 'S';
-  gps[piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lat));
-  gps[piexif.GPSIFD.GPSLongitudeRef] = lng >= 0 ? 'E' : 'W';
-  gps[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lng));
-  gps[piexif.GPSIFD.GPSMapDatum] = 'WGS-84';
-
-  // "Exif\0\0" + TIFF block, as a small binary string → bytes
-  const payloadStr = piexif.dump({ '0th': zeroth, 'Exif': exif, 'GPS': gps });
-  const payload = new Uint8Array(payloadStr.length);
-  for (let i = 0; i < payloadStr.length; i++) payload[i] = payloadStr.charCodeAt(i) & 0xff;
-
-  // APP1 header: marker FF E1 + big-endian length (payload + the 2 length bytes)
-  const segLen = payload.length + 2;
-  const header = new Uint8Array([0xff, 0xe1, (segLen >> 8) & 0xff, segLen & 0xff]);
+  const segment = buildExifApp1({
+    lat,
+    lng,
+    dateTimeOriginal: sourceCaptureTime(),
+    software: 'PanoramaStitcher',
+  });
 
   // Sanity: canvas encoders emit SOI first (FF D8); splice right after it
   const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
   if (head[0] !== 0xff || head[1] !== 0xd8) {
     throw new Error('Stitched blob is not a JPEG (missing SOI marker)');
   }
-  return new Blob([head, header, payload, blob.slice(2)], { type: 'image/jpeg' });
+  return new Blob([head, segment, blob.slice(2)], { type: 'image/jpeg' });
 }
 
 // ---- KML PhotoOverlay ----------------------------------------
@@ -200,22 +182,28 @@ async function prepareExports() {
   const token = ++prepToken;
   exportName = stampName();
   setStatus('Preparing export…');
-  try {
+
+  // JPEG(+KMZ) and PNG are prepared INDEPENDENTLY: if one encoder or
+  // metadata step fails, the other format must still become
+  // downloadable — never leave the user with zero export paths.
+  const notes = [];
+  const jpegTask = (async () => {
     const jpeg = await injectExif(state.result.blob);
     if (token !== prepToken) return;
     preparedJpeg = jpeg;
     urls.main = await armMainAnchor(jpeg);
-    if (token !== prepToken) return;
-    setStatus(`Ready to download (${(jpeg.size / 1024 / 1024).toFixed(1)} MB JPEG). Encoding PNG…`);
+    notes.push(`JPEG ${(jpeg.size / 1024 / 1024).toFixed(1)} MB`);
+  })().catch((err) => { notes.push(`JPEG failed: ${err.message}`); });
 
+  const pngTask = (async () => {
     const png = await resultPngBlob(); // slow for large panoramas
     if (token !== prepToken) return;
     urls.png = arm(downloadPngBtn, png, `${exportName}.png`);
-    setStatus(`Ready to download — JPEG ${(jpeg.size / 1024 / 1024).toFixed(1)} MB / ` +
-              `PNG ${(png.size / 1024 / 1024).toFixed(1)} MB (PNG carries no Exif GPS).`);
-  } catch (err) {
-    if (token === prepToken) setStatus(`Export preparation failed: ${err.message}`);
-  }
+    notes.push(`PNG ${(png.size / 1024 / 1024).toFixed(1)} MB (no Exif GPS)`);
+  })().catch((err) => { notes.push(`PNG failed: ${err.message}`); });
+
+  await Promise.all([jpegTask, pngTask]);
+  if (token === prepToken) setStatus(`Export: ${notes.join(' / ')}.`);
 }
 
 export function initExport() {

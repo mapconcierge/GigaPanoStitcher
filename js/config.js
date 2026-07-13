@@ -3,7 +3,7 @@
 // =========================================================
 
 /** App version, shown next to the title (bump on every release). */
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.8.1';
 
 /** Maximum number of input images. */
 export const MAX_IMAGES = 300;
